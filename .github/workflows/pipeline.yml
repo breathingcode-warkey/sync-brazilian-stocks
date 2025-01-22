@@ -1,0 +1,76 @@
+name: Deploy Node.js Lambda
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest  
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create Lambda ZIP
+        run: zip -r lambda.zip src
+
+      - name: Upload Lambda ZIP to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          aws s3 cp lambda.zip s3://meu-unico-bucket-s3/lambda.zip
+
+      - name: Configure AWS credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+          aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+          aws configure set default.region us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.6
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: terraform
+
+      - name: Import existing S3 Bucket
+        run: |
+          terraform import aws_s3_bucket.lambda_code_bucket meu-unico-bucket-s3 || echo "S3 bucket already managed"
+        working-directory: terraform
+
+      - name: Import existing IAM Role
+        run: |
+          terraform import aws_iam_role.lambda_execution_role lambda_execution_role || echo "IAM Role already managed"
+        working-directory: terraform
+
+      - name: Import existing Lambda function
+        run: |
+          terraform import aws_lambda_function.my_lambda_function arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:my_lambda_function || echo "Lambda function already managed"
+        working-directory: terraform
+
+      - name: Import existing CloudWatch Log Group
+        run: |
+          terraform import aws_cloudwatch_log_group.lambda_log_group /aws/lambda/my_lambda_function || echo "Log group already managed"
+        working-directory: terraform
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        working-directory: terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
