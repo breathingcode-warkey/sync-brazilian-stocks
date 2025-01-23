@@ -1,13 +1,16 @@
-name: Deploy Node.js Lambda
+name: Dynamic Lambda Deployment
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest  
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,16 +22,18 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+      
+      - name: Setup Environment Variables
+        run: echo "PROJECT_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
 
       - name: Create Lambda ZIP
-        run: zip -r lambda.zip src
+        run: zip -r ${{ env.PROJECT_NAME }}.zip src
 
       - name: Upload Lambda ZIP to S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          aws s3 cp lambda.zip s3://meu-unico-bucket-s3/lambda.zip
+        run: aws s3 cp ${{ env.PROJECT_NAME }}.zip s3://meu-unico-bucket-s3/${{ env.PROJECT_NAME }}.zip
 
       - name: Configure AWS credentials
         env:
@@ -48,29 +53,13 @@ jobs:
         run: terraform init
         working-directory: terraform
 
-      - name: Import existing S3 Bucket
+      - name: Import and Apply Terraform
+        env:
+          TF_VAR_project_name: ${{ env.PROJECT_NAME }}
         run: |
           terraform import aws_s3_bucket.lambda_code_bucket meu-unico-bucket-s3 || echo "S3 bucket already managed"
+          terraform import aws_iam_role.lambda_execution_role "${{ env.PROJECT_NAME }}_execution_role" || echo "IAM Role already managed"
+          terraform import aws_lambda_function.my_lambda_function arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:${{ env.PROJECT_NAME }}" || echo "Lambda function already managed"
+          terraform import aws_cloudwatch_log_group.lambda_log_group "/aws/lambda/${{ env.PROJECT_NAME }}" || echo "Log group already managed"
+          terraform apply -auto-approve
         working-directory: terraform
-
-      - name: Import existing IAM Role
-        run: |
-          terraform import aws_iam_role.lambda_execution_role lambda_execution_role || echo "IAM Role already managed"
-        working-directory: terraform
-
-      - name: Import existing Lambda function
-        run: |
-          terraform import aws_lambda_function.my_lambda_function arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:my_lambda_function || echo "Lambda function already managed"
-        working-directory: terraform
-
-      - name: Import existing CloudWatch Log Group
-        run: |
-          terraform import aws_cloudwatch_log_group.lambda_log_group /aws/lambda/my_lambda_function || echo "Log group already managed"
-        working-directory: terraform
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve
-        working-directory: terraform
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
