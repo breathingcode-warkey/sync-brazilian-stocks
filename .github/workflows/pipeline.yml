@@ -22,7 +22,7 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-      
+
       - name: Setup Environment Variables
         run: echo "PROJECT_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
 
@@ -59,7 +59,7 @@ jobs:
         run: |
           terraform import aws_s3_bucket.lambda_code_bucket meu-unico-bucket-s3 || echo "S3 bucket already managed"
           terraform import aws_iam_role.lambda_execution_role "${{ env.PROJECT_NAME }}_execution_role" || echo "IAM Role already managed"
-          terraform import aws_lambda_function.my_lambda_function arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:${{ env.PROJECT_NAME }}" || echo "Lambda function already managed"
+          terraform import aws_lambda_function.my_lambda_function arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:${{ env.PROJECT_NAME }} || echo "Lambda function already managed"
           terraform import aws_cloudwatch_log_group.lambda_log_group "/aws/lambda/${{ env.PROJECT_NAME }}" || echo "Log group already managed"
           terraform apply -auto-approve
         working-directory: terraform
