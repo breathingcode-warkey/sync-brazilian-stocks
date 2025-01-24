@@ -2,11 +2,9 @@ name: Dynamic Lambda Deployment
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   deploy:
@@ -49,35 +47,11 @@ jobs:
         with:
           terraform_version: 1.5.6
 
-      - name: Terraform Init
-        run: terraform init
-        working-directory: terraform
-
-      - name: Import and Apply Terraform
+      - name: Terraform Init and Apply
+        run: |
+          terraform init
+          terraform plan
+          terraform apply -auto-approve
         env:
           TF_VAR_project_name: ${{ env.PROJECT_NAME }}
-        run: |
-          terraform import aws_s3_bucket.lambda_code_bucket meu-unico-bucket-s3 || echo "S3 bucket already managed"
-          IAM_ROLE_ID="${{ env.PROJECT_NAME }}_execution_role"
-          ROLE_EXISTS=$(aws iam get-role --role-name $IAM_ROLE_ID --query 'Role' --output text --no-cli-pager 2>/dev/null)
-          
-          if [ "$ROLE_EXISTS" != "None" ]; then
-            echo "Role exists, importing..."
-            terraform import aws_iam_role.lambda_execution_role $IAM_ROLE_ID || echo "IAM Role already managed"
-          else
-            echo "IAM Role doesn't exist."
-          fi
-          
-          LAMBDA_ARN="arn:aws:lambda:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:function:${{ env.PROJECT_NAME }}"
-          FUNCTION_EXISTS=$(aws lambda get-function --function-name "${{ env.PROJECT_NAME }}" --query 'Configuration.FunctionArn' --output text --no-cli-pager 2>/dev/null)
-          
-          if [ "$FUNCTION_EXISTS" != "None" ]; then
-            echo "Lambda function exists, importing..."
-            terraform import aws_lambda_function.my_lambda_function $LAMBDA_ARN || echo "Lambda function already managed"
-          else
-            echo "Lambda function doesn't exist."
-          fi
-          
-          terraform import aws_cloudwatch_log_group.lambda_log_group "/aws/lambda/${{ env.PROJECT_NAME }}" || echo "Log group already managed"
-          terraform apply -auto-approve
         working-directory: terraform
