@@ -2,12 +2,10 @@ provider "aws" {
   region = var.region
 }
 
-# S3 Bucket para armazenar o ZIP do código da Lambda
 resource "aws_s3_bucket" "lambda_code_bucket" {
-  bucket = "meu-unico-bucket-s3"  # Mantém o mesmo bucket para todos os projetos
+  bucket = "meu-unico-bucket-s3"
 }
 
-# IAM Role para a execução da Lambda
 resource "aws_iam_role" "lambda_execution_role" {
   name = "${var.project_name}_execution_role"
 
@@ -25,8 +23,8 @@ resource "aws_iam_role" "lambda_execution_role" {
   })
 }
 
-# Lambda Function - O nome e outras configurações são ajustadas com base no nome do projeto
 resource "aws_lambda_function" "my_lambda_function" {
+  count         = length(aws_lambda_function.my_lambda_function.*.id) > 0 ? 0 : 1
   function_name = var.project_name
   role          = aws_iam_role.lambda_execution_role.arn
   s3_bucket     = aws_s3_bucket.lambda_code_bucket.bucket
@@ -40,8 +38,7 @@ resource "aws_lambda_function" "my_lambda_function" {
   }
 }
 
-# CloudWatch Log Group para a função Lambda
 resource "aws_cloudwatch_log_group" "lambda_log_group" {
-  name              = "/aws/lambda/${var.project_name}" 
+  name              = "/aws/lambda/${var.project_name}"
   retention_in_days = 14
 }
