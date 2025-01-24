@@ -1,5 +1,5 @@
 output "lambda_arn" {
-  value = length(aws_lambda_function.my_lambda_function) > 0 ? aws_lambda_function.my_lambda_function[0].arn : ""
+  value = aws_lambda_function.my_lambda_function.arn
 }
 
 output "bucket_name" {
@@ -7,5 +7,5 @@ output "bucket_name" {
 }
 
 output "lambda_function_name" {
-  value = length(aws_lambda_function.my_lambda_function) > 0 ? aws_lambda_function.my_lambda_function[0].function_name : ""
+  value = aws_lambda_function.my_lambda_function.function_name
 }
