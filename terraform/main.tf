@@ -24,14 +24,15 @@ resource "aws_iam_role" "lambda_execution_role" {
 }
 
 resource "aws_lambda_function" "my_lambda_function" {
-  count         = length(aws_lambda_function.my_lambda_function.*.id) > 0 ? 0 : 1
   function_name = var.project_name
   role          = aws_iam_role.lambda_execution_role.arn
+  handler       = "src/index.handler"
+  runtime       = "nodejs20.x"
   s3_bucket     = aws_s3_bucket.lambda_code_bucket.bucket
   s3_key        = "${var.project_name}.zip"
-  runtime       = "nodejs20.x"
-  handler       = "src/index.handler"
   timeout       = 15
+
+  depends_on = [aws_iam_role.lambda_execution_role, aws_s3_bucket.lambda_code_bucket]
 
   lifecycle {
     ignore_changes = [s3_key]
@@ -41,4 +42,6 @@ resource "aws_lambda_function" "my_lambda_function" {
 resource "aws_cloudwatch_log_group" "lambda_log_group" {
   name              = "/aws/lambda/${var.project_name}"
   retention_in_days = 14
+
+  depends_on = [aws_lambda_function.my_lambda_function]
 }
